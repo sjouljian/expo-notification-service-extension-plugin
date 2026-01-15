@@ -218,7 +218,7 @@ const withOneSignalXcodeProject: ConfigPlugin<NSEPluginProps> = (config, props) 
 export const withServiceExtensionIos: ConfigPlugin<NSEPluginProps> = (config, props) => {
   config = withAppEnvironment(config, props);
   config = withRemoteNotificationsPermissions(config, props);
-  config = withAppGroupPermissions(config, props);
+  //config = withAppGroupPermissions(config, props);
   config = withOneSignalNSE(config, props)
   config = withOneSignalXcodeProject(config, props)
   config = withEasManagedCredentials(config, props);
