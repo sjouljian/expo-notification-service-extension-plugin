@@ -16,11 +16,11 @@ export default class NseUpdaterManager {
     this.nsePath = `${iosPath}/${NSE_TARGET_NAME}`;
   }
 
-  async updateNSEEntitlements(groupIdentifier: string, filtering?: boolean): Promise<void> {
+  async updateNSEEntitlements(filtering?: boolean): Promise<void> {
     const entitlementsFilePath = `${this.nsePath}/${entitlementsFileName}`;
     let entitlementsFile = await FileManager.readFile(entitlementsFilePath);
 
-    entitlementsFile = entitlementsFile.replace(GROUP_IDENTIFIER_TEMPLATE_REGEX, groupIdentifier);
+    // App Groups are no longer used - entitlements file is now minimal
 
     if (filtering) {
       const filteringKey = `  <key>com.apple.developer.usernotifications.filtering</key>\n  <true/>`;

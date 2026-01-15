@@ -57,7 +57,7 @@ const withAppEnvironment: ConfigPlugin<NSEPluginProps> = (
 };
 
 /**
- * Add "Background Modes -> Remote notifications" and "App Group" permissions
+ * Add "Background Modes -> Remote notifications" permission
  * @see https://documentation.onesignal.com/docs/react-native-sdk-setup#step-4-install-for-ios-using-cocoapods-for-ios-apps
  */
 const withRemoteNotificationsPermissions: ConfigPlugin<NSEPluginProps> = (
@@ -79,27 +79,9 @@ const withRemoteNotificationsPermissions: ConfigPlugin<NSEPluginProps> = (
 };
 
 /**
- * Add "App Group" permission
- * @see https://documentation.onesignal.com/docs/react-native-sdk-setup#step-4-install-for-ios-using-cocoapods-for-ios-apps (step 4.4)
+ * NOTE: App Group permission removed - no longer required for the NSE
+ * Previous implementation added app groups which required provisioning profile configuration
  */
-const withAppGroupPermissions: ConfigPlugin<NSEPluginProps> = (
-  config
-) => {
-  const APP_GROUP_KEY = "com.apple.security.application-groups";
-  return withEntitlementsPlist(config, newConfig => {
-    if (!Array.isArray(newConfig.modResults[APP_GROUP_KEY])) {
-      newConfig.modResults[APP_GROUP_KEY] = [];
-    }
-    const modResultsArray = (newConfig.modResults[APP_GROUP_KEY] as Array<any>);
-    const entitlement = `group.${newConfig?.ios?.bundleIdentifier || ""}.nse`;
-    if (modResultsArray.indexOf(entitlement) !== -1) {
-      return newConfig;
-    }
-    modResultsArray.push(entitlement);
-
-    return newConfig;
-  });
-};
 
 const withEasManagedCredentials: ConfigPlugin<NSEPluginProps> = (config) => {
   assert(config.ios?.bundleIdentifier, "Missing 'ios.bundleIdentifier' in app config.")
@@ -133,7 +115,7 @@ const withOneSignalNSE: ConfigPlugin<NSEPluginProps> = (config, props) => {
 
       /* MODIFY COPIED EXTENSION FILES */
       const nseUpdater = new NseUpdaterManager(iosPath);
-      await nseUpdater.updateNSEEntitlements(`group.${config.ios?.bundleIdentifier}.nse`, props?.filtering)
+      await nseUpdater.updateNSEEntitlements(props?.filtering)
       await nseUpdater.updateNSEBundleVersion(config.ios?.buildNumber ?? DEFAULT_BUNDLE_VERSION);
       await nseUpdater.updateNSEBundleShortVersion(config?.version ?? DEFAULT_BUNDLE_SHORT_VERSION);
 
@@ -218,7 +200,6 @@ const withOneSignalXcodeProject: ConfigPlugin<NSEPluginProps> = (config, props) 
 export const withServiceExtensionIos: ConfigPlugin<NSEPluginProps> = (config, props) => {
   config = withAppEnvironment(config, props);
   config = withRemoteNotificationsPermissions(config, props);
-  //config = withAppGroupPermissions(config, props);
   config = withOneSignalNSE(config, props)
   config = withOneSignalXcodeProject(config, props)
   config = withEasManagedCredentials(config, props);
