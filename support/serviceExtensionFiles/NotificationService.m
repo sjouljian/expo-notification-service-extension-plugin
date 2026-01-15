@@ -1,4 +1,5 @@
 #import "NotificationService.h"
+#import "FirebaseMessaging.h"
 
 @interface NotificationService ()
 
