@@ -15,15 +15,21 @@ export class PodfileManager {
    * @param podDependencies Array of pod dependency strings (e.g., ["Firebase/Messaging"])
    */
   async addPodDependencies(podDependencies?: string[]): Promise<void> {
+    Log.log(`[PodfileManager] Called with podDependencies: ${JSON.stringify(podDependencies)}`);
+    
     if (!podDependencies || podDependencies.length === 0) {
-      Log.log('No pod dependencies specified for NotificationServiceExtension target.');
+      Log.log('[PodfileManager] No pod dependencies specified for NotificationServiceExtension target.');
       return;
     }
 
+    Log.log(`[PodfileManager] Looking for Podfile at: ${this.podfilePath}`);
+    
     if (!fs.existsSync(this.podfilePath)) {
-      Log.error(`Podfile not found at ${this.podfilePath}`);
+      Log.error(`[PodfileManager] Podfile not found at ${this.podfilePath}`);
       return;
     }
+    
+    Log.log(`[PodfileManager] Podfile found! Reading contents...`);
 
     try {
       let podfileContent = fs.readFileSync(this.podfilePath, 'utf-8');
@@ -32,9 +38,11 @@ export class PodfileManager {
       const nseTargetRegex = new RegExp(`target\\s+['"]${NSE_TARGET_NAME}['"]`, 'i');
       
       if (nseTargetRegex.test(podfileContent)) {
-        Log.log(`${NSE_TARGET_NAME} target already exists in Podfile. Skipping pod dependency injection.`);
+        Log.log(`[PodfileManager] ${NSE_TARGET_NAME} target already exists in Podfile. Skipping pod dependency injection.`);
         return;
       }
+      
+      Log.log(`[PodfileManager] NSE target not found in Podfile. Adding it now...`);
 
       // Create the NSE target block with pod dependencies
       const podLines = podDependencies.map(dep => {
@@ -83,16 +91,19 @@ end
 
       if (insertIndex === -1) {
         // If we can't find a good insertion point, append to the end
-        Log.log('Could not find main target block, appending NSE target to end of Podfile.');
+        Log.log('[PodfileManager] Could not find main target block, appending NSE target to end of Podfile.');
         podfileContent += '\n' + nseTargetBlock;
       } else {
         // Insert the NSE target block after the main target
+        Log.log(`[PodfileManager] Inserting NSE target at line ${insertIndex}`);
         lines.splice(insertIndex, 0, nseTargetBlock);
         podfileContent = lines.join('\n');
       }
 
+      Log.log(`[PodfileManager] Writing updated Podfile to: ${this.podfilePath}`);
       fs.writeFileSync(this.podfilePath, podfileContent, 'utf-8');
-      Log.log(`✅ Successfully added ${podDependencies.length} pod dependencies to ${NSE_TARGET_NAME} target in Podfile.`);
+      Log.log(`✅ [PodfileManager] Successfully added ${podDependencies.length} pod dependencies to ${NSE_TARGET_NAME} target in Podfile.`);
+      Log.log(`[PodfileManager] Added target block:\n${nseTargetBlock}`);
     } catch (error) {
       Log.error(`Failed to modify Podfile: ${error}`);
       throw error;

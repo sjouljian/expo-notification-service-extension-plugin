@@ -1,13 +1,13 @@
 {
   "name": "expo-notification-service-extension-plugin",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Expo plugin that expects a notification service extension file as an input and copies it to XCode binaries",
   "main": "./app.plugin.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "yarn run lint && rm -rf build && tsc && cp -a support/serviceExtensionFiles build/support/",
+    "build": "npm run lint && node -e \"require('fs').rmSync('build', {recursive: true, force: true})\" && tsc && node -e \"require('fs').cpSync('support/serviceExtensionFiles', 'build/support/serviceExtensionFiles', {recursive: true})\"",
     "lint": "eslint . --ext .ts",
-    "prepare": "yarn run build"
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",

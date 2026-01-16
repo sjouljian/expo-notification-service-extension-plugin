@@ -121,8 +121,10 @@ const withOneSignalNSE: ConfigPlugin<NSEPluginProps> = (config, props) => {
       await nseUpdater.updateNSEBundleShortVersion(config?.version ?? DEFAULT_BUNDLE_SHORT_VERSION);
 
       /* ADD POD DEPENDENCIES TO PODFILE */
+      Log.log(`[withServiceExtensionIos] Attempting to add pod dependencies: ${JSON.stringify(props?.podDependencies)}`);
       const podfileManager = new PodfileManager(iosPath);
       await podfileManager.addPodDependencies(props?.podDependencies);
+      Log.log('[withServiceExtensionIos] Pod dependency addition completed.');
 
       return config;
     },
