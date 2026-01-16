@@ -70,11 +70,14 @@ class PodfileManager {
             const usesFrameworks = podfileContent.includes('use_frameworks!');
             const frameworksLine = usesFrameworks ? '  use_frameworks! :linkage => :static\n' : '';
             // Extension target should NOT use use_native_modules! or inherit React Native dependencies
+            // We explicitly set inherit! :none to prevent inheriting ANY dependencies from search paths
             const nseTargetBlock = `
-# NotificationServiceExtension target - isolated from main app dependencies
-# This target should only include the minimal pods needed for the extension
+# NotificationServiceExtension target - completely isolated from main app
+# IMPORTANT: Do not add use_native_modules! here - extension should not link React Native
 target '${iosConstants_1.NSE_TARGET_NAME}' do
-${frameworksLine}${podLines}
+${frameworksLine}  # Only inherit search paths, not link dependencies
+  inherit! :search_paths
+${podLines}
 end
 `;
             // Find the best insertion point - after the main app target's 'end'
