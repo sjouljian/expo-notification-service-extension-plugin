@@ -120,6 +120,12 @@ end
       }
 
       Log.log(`[PodfileManager] Writing updated Podfile to: ${this.podfilePath}`);
+      // Note: We don't add a post_install hook here because:
+      // 1. The main app target usually already has one
+      // 2. The extension target is isolated and only includes specified pods
+      // 3. APPLICATION_EXTENSION_API_ONLY is set in Xcode build settings
+      Log.log('[PodfileManager] Extension target configured without React Native dependencies');
+
       fs.writeFileSync(this.podfilePath, podfileContent, 'utf-8');
       Log.log(`✅ [PodfileManager] Successfully added ${podDependencies.length} pod dependencies to ${NSE_TARGET_NAME} target in Podfile.`);
       Log.log(`[PodfileManager] Added target block:\n${nseTargetBlock}`);
