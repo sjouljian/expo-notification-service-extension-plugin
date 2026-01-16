@@ -90,6 +90,71 @@ You can pass props to the plugin config object to configure:
 | `filtering`              | optional | This will enable the Notification Service Extension to filter and modify incoming push notifications before they appear on the user's device. Requires com.apple.developer.usernotifications.filtering entitlement. `true` or `false` |
 | `devTeam`                | optional | Used to configure Apple Team ID. You can find your Apple Team ID by running `expo credentials:manager`  e.g: `"91SW8A37CR"`                                                                                                                                                                                                    |
 | `iPhoneDeploymentTarget` | optional | Target `IPHONEOS_DEPLOYMENT_TARGET` value to be used when adding the iOS [NSE](https://documentation.onesignal.com/docs/service-extensions). A deployment target is nothing more than the minimum version of the operating system the application can run on. This value should match the value in your Podfile e.g: `"12.0"`. |
+| `podDependencies`        | optional | Array of CocoaPods dependencies to add to the NotificationServiceExtension target. Required if your NSE imports Firebase or other native libraries. e.g: `["Firebase/Messaging"]`                                                                                                                                               |
+
+## Using Firebase Cloud Messaging
+
+If your Notification Service Extension needs to import Firebase (e.g., `#import <FirebaseMessaging/FirebaseMessaging.h>`), you **must** configure the `podDependencies` option to link Firebase pods to the extension target.
+
+### Configuration Example
+
+**app.json**
+```json
+{
+  "plugins": [
+    [
+      "expo-notification-service-extension-plugin",
+      {
+        "mode": "development",
+        "iosNSEFilePath": "./assets/NotificationService.m",
+        "podDependencies": ["Firebase/Messaging"]
+      }
+    ]
+  ]
+}
+```
+
+**app.config.js**
+```js
+export default {
+  plugins: [
+    [
+      "expo-notification-service-extension-plugin",
+      {
+        mode: "development", 
+        iosNSEFilePath: "./assets/NotificationService.m",
+        podDependencies: ["Firebase/Messaging"]
+      }
+    ]
+  ]
+};
+```
+
+### How It Works
+
+The plugin will automatically:
+1. Create a separate `target 'NotificationServiceExtension'` block in your iOS Podfile
+2. Add the specified pod dependencies to that target
+3. Ensure Firebase (or other native libraries) are properly linked to the extension
+
+### Common Pod Dependencies
+
+- **Firebase/Messaging** - Required if using `#import <FirebaseMessaging/FirebaseMessaging.h>`
+- **Firebase/Core** - Usually included automatically with Firebase/Messaging
+- **OneSignalXCFramework** - If using OneSignal instead of Firebase
+
+### Example NotificationService.m with Firebase
+
+See [NotificationService-Firebase-Example.m](support/serviceExtensionFiles/NotificationService-Firebase-Example.m) for a complete working example that shows how to integrate Firebase Messaging in your notification service extension.
+
+### Troubleshooting
+
+If you get errors like:
+```
+'FirebaseMessaging.h' file not found (in target 'NotificationServiceExtension' from project 'YourApp')
+```
+
+This means the Firebase pod is not linked to the NotificationServiceExtension target. **Solution:** Add `"podDependencies": ["Firebase/Messaging"]` to your plugin configuration and run `npx expo prebuild --clean`.
 
 ## Prebuild (optional)
 Prebuilding in Expo will result in the generation of the native runtime code for the project (and `ios` and `android` directories being built). By prebuilding, we automatically link and configure the native modules that have implemented CocoaPods, autolinking, and other config plugins. You can think of prebuild like a native code bundler.

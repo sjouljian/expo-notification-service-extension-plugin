@@ -23,6 +23,7 @@ import {
 import NseUpdaterManager from "../support/NseUpdaterManager";
 import { Log } from "../support/Log";
 import { FileManager } from "../support/FileManager";
+import { PodfileManager } from "../support/PodfileManager";
 import { NSEPluginProps } from "../types/types";
 import assert from 'assert';
 import getEasManagedCredentialsConfigExtra from "../support/eas/getEasManagedCredentialsConfigExtra";
@@ -118,6 +119,10 @@ const withOneSignalNSE: ConfigPlugin<NSEPluginProps> = (config, props) => {
       await nseUpdater.updateNSEEntitlements(props?.filtering)
       await nseUpdater.updateNSEBundleVersion(config.ios?.buildNumber ?? DEFAULT_BUNDLE_VERSION);
       await nseUpdater.updateNSEBundleShortVersion(config?.version ?? DEFAULT_BUNDLE_SHORT_VERSION);
+
+      /* ADD POD DEPENDENCIES TO PODFILE */
+      const podfileManager = new PodfileManager(iosPath);
+      await podfileManager.addPodDependencies(props?.podDependencies);
 
       return config;
     },

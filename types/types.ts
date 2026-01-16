@@ -31,6 +31,13 @@ export type NSEPluginProps = {
      * the minimum version of the operating system the application can run on. This value should match the value in your Podfile e.g: "12.0".
      */
     iPhoneDeploymentTarget?: string;
+
+    /**
+     * (optional) Array of CocoaPods dependencies to add to the NotificationServiceExtension target.
+     * Required if your NSE uses Firebase or other native libraries.
+     * Example: ["Firebase/Messaging"] or ["Firebase/Messaging", "FirebaseCore"]
+     */
+    podDependencies?: string[];
 };
 
 export const NSE_PLUGIN_PROPS: string[] = [
@@ -38,7 +45,8 @@ export const NSE_PLUGIN_PROPS: string[] = [
     "iosNSEFilePath",
     "filtering",
     "devTeam",
-    "iPhoneDeploymentTarget"
+    "iPhoneDeploymentTarget",
+    "podDependencies"
 ];
 
 export enum Mode {
