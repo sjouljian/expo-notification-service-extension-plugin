@@ -1,5 +1,40 @@
 # Troubleshooting Guide
 
+## Error: Multiple commands produce 'GoogleUtilities.framework'
+
+### Problem
+```
+❌ error: Multiple commands produce '/path/to/GoogleUtilities.framework'
+```
+
+### Root Cause
+Both the main app and extension targets are building the same Firebase framework, causing duplicate outputs.
+
+### Solution
+
+The extension target should use `inherit! :search_paths` **without** a separate `use_frameworks!` call. The correct Podfile structure:
+
+```ruby
+target 'YourApp' do
+  use_frameworks! :linkage => :static  # ← Only in main target
+  use_native_modules!
+  # ... other pods
+end
+
+target 'NotificationServiceExtension' do
+  inherit! :search_paths  # ← Share headers, not frameworks
+  pod 'Firebase/Messaging'
+  # NO use_frameworks! here
+end
+```
+
+This allows the extension to:
+- ✅ Share the Firebase frameworks already built by the main target
+- ✅ Avoid duplicate build products
+- ✅ Use Firebase APIs without rebuilding
+
+---
+
 ## Error: 'sharedApplication' is unavailable: not available on iOS (App Extension)
 
 ### Problem

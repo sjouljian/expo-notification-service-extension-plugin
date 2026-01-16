@@ -58,17 +58,14 @@ export class PodfileManager {
         return `  pod '${trimmed}'`;
       }).join('\n');
 
-      // Check if main target uses use_frameworks
-      const usesFrameworks = podfileContent.includes('use_frameworks!');
-      const frameworksLine = usesFrameworks ? '  use_frameworks! :linkage => :static\n' : '';
-
       // Extension target should NOT use use_native_modules! or inherit React Native dependencies
-      // We explicitly set inherit! :none to prevent inheriting ANY dependencies from search paths
+      // Use inherit! :search_paths to share headers but not link dependencies
+      // Do NOT add use_frameworks! separately - it causes duplicate build products
       const nseTargetBlock = `
 # NotificationServiceExtension target - completely isolated from main app
 # IMPORTANT: Do not add use_native_modules! here - extension should not link React Native
+# inherit! :search_paths allows sharing headers while keeping dependencies separate
 target '${NSE_TARGET_NAME}' do
-${frameworksLine}  # Only inherit search paths, not link dependencies
   inherit! :search_paths
 ${podLines}
 end
