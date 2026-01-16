@@ -16,22 +16,24 @@ The extension target should use `inherit! :search_paths` **without** a separate 
 
 ```ruby
 target 'YourApp' do
-  use_frameworks! :linkage => :static  # ← Only in main target
+  use_frameworks! :linkage => :static
+  use_expo_modules!
   use_native_modules!
   # ... other pods
 end
 
 target 'NotificationServiceExtension' do
-  inherit! :search_paths  # ← Share headers, not frameworks
+  pod 'GoogleUtilities'  # ← Required for Firebase
   pod 'Firebase/Messaging'
-  # NO use_frameworks! here
+  # NO use_frameworks!, NO use_expo_modules!, NO inherit!
 end
 ```
 
-This allows the extension to:
-- ✅ Share the Firebase frameworks already built by the main target
-- ✅ Avoid duplicate build products
-- ✅ Use Firebase APIs without rebuilding
+**Key Points:**
+- ✅ Extension target is completely standalone
+- ✅ GoogleUtilities is automatically added when using Firebase
+- ✅ No inheritance directives needed
+- ✅ Avoids duplicate build products
 
 ---
 

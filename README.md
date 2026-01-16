@@ -135,7 +135,8 @@ export default {
 The plugin will automatically:
 1. Create a separate `target 'NotificationServiceExtension'` block in your iOS Podfile
 2. Add the specified pod dependencies to that target
-3. Ensure Firebase (or other native libraries) are properly linked to the extension
+3. Automatically include `GoogleUtilities` when using Firebase (required dependency)
+4. Keep the extension target completely isolated from React Native and app dependencies
 
 ### Common Pod Dependencies
 

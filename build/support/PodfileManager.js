@@ -66,16 +66,16 @@ class PodfileManager {
                 }
                 return `  pod '${trimmed}'`;
             }).join('\n');
-            // Extension target should NOT use use_native_modules! or inherit React Native dependencies
-            // Use inherit! :search_paths to share headers but not link dependencies
-            // Do NOT add use_frameworks! separately - it causes duplicate build products
+            // Check if Firebase/Messaging is in the dependencies - if so, add GoogleUtilities
+            const needsGoogleUtilities = podDependencies.some(dep => dep.includes('Firebase') || dep.includes('firebase'));
+            const googleUtilitiesLine = needsGoogleUtilities
+                ? "  pod 'GoogleUtilities'\n"
+                : '';
+            // Extension target should be completely standalone without any inheritance
+            // Based on working Podfile structure from production apps
             const nseTargetBlock = `
-# NotificationServiceExtension target - completely isolated from main app
-# IMPORTANT: Do not add use_native_modules! here - extension should not link React Native
-# inherit! :search_paths allows sharing headers while keeping dependencies separate
 target '${iosConstants_1.NSE_TARGET_NAME}' do
-  inherit! :search_paths
-${podLines}
+${googleUtilitiesLine}${podLines}
 end
 `;
             // Find the best insertion point - after the main app target's 'end'
