@@ -164,6 +164,7 @@ const withOneSignalXcodeProject = (config, props) => {
                 buildSettingsObj.TARGETED_DEVICE_FAMILY = iosConstants_1.TARGETED_DEVICE_FAMILY;
                 buildSettingsObj.CODE_SIGN_ENTITLEMENTS = `${iosConstants_1.NSE_TARGET_NAME}/${iosConstants_1.NSE_TARGET_NAME}.entitlements`;
                 buildSettingsObj.CODE_SIGN_STYLE = "Automatic";
+                buildSettingsObj.SWIFT_VERSION = "5.0";
             }
         }
         // Add development teams to both your target and the original project
