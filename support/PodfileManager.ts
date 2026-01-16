@@ -58,9 +58,13 @@ export class PodfileManager {
         return `  pod '${trimmed}'`;
       }).join('\n');
 
+      // Check if main target uses use_frameworks
+      const usesFrameworks = podfileContent.includes('use_frameworks!');
+      const frameworksLine = usesFrameworks ? '  use_frameworks! :linkage => :static\n' : '';
+
       const nseTargetBlock = `
 target '${NSE_TARGET_NAME}' do
-${podLines}
+${frameworksLine}${podLines}
 end
 `;
 
@@ -68,23 +72,35 @@ end
       const lines = podfileContent.split('\n');
       let insertIndex = -1;
       let targetDepth = 0;
-      let inTarget = false;
+      let blockDepth = 0;
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
         // Track when we enter a target block
         if (line.match(/^target\s+/)) {
-          inTarget = true;
-          targetDepth++;
+          targetDepth = 1;
+          blockDepth = 0;
+          continue;
         }
         
-        // Track when we exit a target block
-        if (line === 'end' && inTarget) {
-          targetDepth--;
-          if (targetDepth === 0) {
-            insertIndex = i + 1;
-            inTarget = false;
+        // If we're in a target, track all do/end pairs
+        if (targetDepth > 0) {
+          // Count 'do' keywords (for blocks like post_install do)
+          if (line.includes(' do') || line.endsWith(' do') || line === 'do') {
+            blockDepth++;
+          }
+          
+          // Count 'end' keywords
+          if (line === 'end' || line.startsWith('end ')) {
+            if (blockDepth > 0) {
+              // This 'end' closes a nested block (like post_install)
+              blockDepth--;
+            } else {
+              // This 'end' closes the target itself
+              insertIndex = i + 1;
+              targetDepth = 0;
+            }
           }
         }
       }
