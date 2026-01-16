@@ -168,6 +168,25 @@ end
           dependency.name.start_with?('FBReact')
         end
       end
+    end
+    
+    # Remove Expo and React Native build scripts from extension target
+    installer.aggregate_targets.each do |aggregate_target|
+      aggregate_target.user_project.native_targets.each do |target|
+        if target.name == 'NotificationServiceExtension'
+          target.build_phases.each do |build_phase|
+            if build_phase.respond_to?(:name) && build_phase.is_a?(Xcodeproj::Project::Object::PBXShellScriptBuildPhase)
+              if build_phase.name&.include?('Expo') || 
+                 build_phase.name&.include?('React') ||
+                 build_phase.name&.include?('Bundle') ||
+                 build_phase.shell_script&.include?('react-native')
+                puts "[expo-notification-service-extension-plugin] Removing build script: #{build_phase.name}"
+                target.build_phases.delete(build_phase)
+              end
+            end
+          end
+        end
+      end
     end`;
         // Check if there's already a post_install block
         const postInstallRegex = /post_install\s+do\s+\|installer\|/;

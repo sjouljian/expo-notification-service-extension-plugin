@@ -205,6 +205,11 @@ const withOneSignalXcodeProject: ConfigPlugin<NSEPluginProps> = (config, props) 
     // Add development teams to both your target and the original project
     xcodeProject.addTargetAttribute("DevelopmentTeam", props?.devTeam, nseTarget);
     xcodeProject.addTargetAttribute("DevelopmentTeam", props?.devTeam);
+    
+    // Mark this target as not needing Expo build scripts
+    // This prevents Expo from adding React Native compilation scripts to the extension
+    xcodeProject.addTargetAttribute("ExpoIntegrationEnabled", "NO", nseTarget);
+    
     return newConfig;
   })
 }
