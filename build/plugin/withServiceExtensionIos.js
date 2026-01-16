@@ -166,6 +166,9 @@ const withOneSignalXcodeProject = (config, props) => {
                 buildSettingsObj.CODE_SIGN_STYLE = "Automatic";
                 buildSettingsObj.SWIFT_VERSION = "5.0";
                 buildSettingsObj.APPLICATION_EXTENSION_API_ONLY = "YES";
+                // Prevent duplicate framework builds when using static frameworks
+                buildSettingsObj.ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = "NO";
+                buildSettingsObj.CLANG_ENABLE_MODULES = "YES";
             }
         }
         // Add development teams to both your target and the original project

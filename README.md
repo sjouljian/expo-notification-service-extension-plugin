@@ -150,12 +150,19 @@ See [NotificationService-Firebase-Example.m](support/serviceExtensionFiles/Notif
 
 ### Troubleshooting
 
-If you get errors like:
+#### Error: 'FirebaseMessaging.h' file not found
 ```
-'FirebaseMessaging.h' file not found (in target 'NotificationServiceExtension' from project 'YourApp')
+'FirebaseMessaging.h' file not found (in target 'NotificationServiceExtension')
 ```
 
-This means the Firebase pod is not linked to the NotificationServiceExtension target. **Solution:** Add `"podDependencies": ["Firebase/Messaging"]` to your plugin configuration and run `npx expo prebuild --clean`.
+**Solution:** Add `"podDependencies": ["Firebase/Messaging"]` to your plugin configuration and run `npx expo prebuild --clean`.
+
+#### Error: Multiple commands produce 'GoogleUtilities.framework'
+```
+❌ error: Multiple commands produce '/path/to/GoogleUtilities.framework'
+```
+
+This is a **CocoaPods limitation** with static frameworks. After running `expo prebuild`, you need to manually add a `post_install` hook to your `ios/Podfile`. See [MANUAL_PODFILE_SETUP.md](MANUAL_PODFILE_SETUP.md) for detailed solutions.
 
 ## Prebuild (optional)
 Prebuilding in Expo will result in the generation of the native runtime code for the project (and `ios` and `android` directories being built). By prebuilding, we automatically link and configure the native modules that have implemented CocoaPods, autolinking, and other config plugins. You can think of prebuild like a native code bundler.

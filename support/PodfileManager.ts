@@ -58,20 +58,15 @@ export class PodfileManager {
         return `  pod '${trimmed}'`;
       }).join('\n');
 
-      // Check if Firebase/Messaging is in the dependencies - if so, add GoogleUtilities
-      const needsGoogleUtilities = podDependencies.some(dep => 
-        dep.includes('Firebase') || dep.includes('firebase')
-      );
-      
-      const googleUtilitiesLine = needsGoogleUtilities 
-        ? "  pod 'GoogleUtilities'\n" 
-        : '';
-
-      // Extension target should be completely standalone without any inheritance
-      // Based on working Podfile structure from production apps
+      // Extension target needs special configuration to avoid duplicate framework builds
+      // When using static frameworks, we must either:
+      // 1. Make extension a nested target (inherits all pods)
+      // 2. Use :linkage => :dynamic
+      // 3. Configure build settings to share frameworks
+      // We'll use approach #3 - standalone target with only required pods
       const nseTargetBlock = `
 target '${NSE_TARGET_NAME}' do
-${googleUtilitiesLine}${podLines}
+${podLines}
 end
 `;
 
@@ -124,18 +119,100 @@ end
       }
 
       Log.log(`[PodfileManager] Writing updated Podfile to: ${this.podfilePath}`);
-      // Note: We don't add a post_install hook here because:
-      // 1. The main app target usually already has one
-      // 2. The extension target is isolated and only includes specified pods
-      // 3. APPLICATION_EXTENSION_API_ONLY is set in Xcode build settings
-      Log.log('[PodfileManager] Extension target configured without React Native dependencies');
-
       fs.writeFileSync(this.podfilePath, podfileContent, 'utf-8');
       Log.log(`✅ [PodfileManager] Successfully added ${podDependencies.length} pod dependencies to ${NSE_TARGET_NAME} target in Podfile.`);
       Log.log(`[PodfileManager] Added target block:\n${nseTargetBlock}`);
+
+      // Add post_install hook to fix duplicate framework builds
+      // This modifies the file again to inject into existing post_install
+      this.addPostInstallHook();
     } catch (error) {
       Log.error(`Failed to modify Podfile: ${error}`);
       throw error;
+    }
+  }
+
+  /**
+   * Adds code to the existing post_install hook to fix duplicate framework builds
+   * This prevents "Multiple commands produce" errors with static frameworks
+   */
+  private addPostInstallHook(): void {
+    Log.log('[PodfileManager] Adding post_install hook to fix duplicate framework builds');
+
+    // Read the Podfile again (it was just written)
+    const podfileContent = fs.readFileSync(this.podfilePath, 'utf-8');
+
+    const postInstallFix = `
+    # Fix duplicate framework builds for extension targets (added by expo-notification-service-extension-plugin)
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # Build frameworks once and share them across targets
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      end
+    end`;
+
+    // Check if there's already a post_install block
+    const postInstallRegex = /post_install\s+do\s+\|installer\|/;
+    
+    if (postInstallRegex.test(podfileContent)) {
+      Log.log('[PodfileManager] Found existing post_install block, injecting framework fix');
+      
+      // Find the end of the post_install block and inject before the last 'end'
+      const lines = podfileContent.split('\n');
+      let postInstallStart = -1;
+      let postInstallEnd = -1;
+      let depth = 0;
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        if (postInstallRegex.test(line)) {
+          postInstallStart = i;
+          depth = 1;
+          continue;
+        }
+        
+        if (postInstallStart !== -1 && depth > 0) {
+          // Count do/end pairs
+          if (line.includes(' do') || line.endsWith(' do') || line.trim() === 'do') {
+            depth++;
+          }
+          if (line.trim() === 'end' || line.trim().startsWith('end ')) {
+            depth--;
+            if (depth === 0) {
+              postInstallEnd = i;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (postInstallEnd !== -1) {
+        // Check if our fix is already there
+        const postInstallContent = lines.slice(postInstallStart, postInstallEnd).join('\n');
+        if (postInstallContent.includes('BUILD_LIBRARY_FOR_DISTRIBUTION')) {
+          Log.log('[PodfileManager] Framework fix already present in post_install');
+          return;
+        }
+        
+        // Insert before the closing 'end' of post_install
+        lines.splice(postInstallEnd, 0, postInstallFix);
+        const newContent = lines.join('\n');
+        fs.writeFileSync(this.podfilePath, newContent, 'utf-8');
+        Log.log('[PodfileManager] ✅ Injected framework fix into existing post_install');
+      } else {
+        Log.log('[PodfileManager] ⚠️ Could not find end of post_install block');
+      }
+    } else {
+      Log.log('[PodfileManager] No existing post_install found, plugin post_install will be added at end');
+      // This shouldn't happen in Expo projects, but handle it anyway
+      const newPostInstall = `
+post_install do |installer|
+  ${postInstallFix}
+end
+`;
+      fs.appendFileSync(this.podfilePath, newPostInstall, 'utf-8');
+      Log.log('[PodfileManager] ✅ Added new post_install block with framework fix');
     }
   }
 }
