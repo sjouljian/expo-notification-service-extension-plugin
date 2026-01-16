@@ -162,7 +162,7 @@ See [NotificationService-Firebase-Example.m](support/serviceExtensionFiles/Notif
 ❌ error: Multiple commands produce '/path/to/GoogleUtilities.framework'
 ```
 
-This is a **CocoaPods limitation** with static frameworks. After running `expo prebuild`, you need to manually add a `post_install` hook to your `ios/Podfile`. See [MANUAL_PODFILE_SETUP.md](MANUAL_PODFILE_SETUP.md) for detailed solutions.
+**The plugin now automatically fixes this!** It injects `BUILD_LIBRARY_FOR_DISTRIBUTION = 'YES'` into your Podfile's `post_install` hook to prevent duplicate framework builds. If you still see this error, run `npx expo prebuild --clean` to regenerate the Podfile.
 
 ## Prebuild (optional)
 Prebuilding in Expo will result in the generation of the native runtime code for the project (and `ios` and `android` directories being built). By prebuilding, we automatically link and configure the native modules that have implemented CocoaPods, autolinking, and other config plugins. You can think of prebuild like a native code bundler.
