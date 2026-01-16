@@ -143,11 +143,30 @@ end
     const podfileContent = fs.readFileSync(this.podfilePath, 'utf-8');
 
     const postInstallFix = `
-    # Fix duplicate framework builds for extension targets (added by expo-notification-service-extension-plugin)
+    # Fix duplicate framework builds and remove React Native from extension (added by expo-notification-service-extension-plugin)
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         # Build frameworks once and share them across targets
         config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+        
+        # Exclude React Native and app-only dependencies from NotificationServiceExtension
+        if target.name.include?('NotificationServiceExtension') || target.name.include?('Pods-NotificationServiceExtension')
+          config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
+        end
+      end
+    end
+    
+    # Remove React Native pods from extension target dependencies
+    installer.pods_project.targets.each do |target|
+      if target.name == 'Pods-NotificationServiceExtension'
+        target.dependencies.delete_if do |dependency|
+          dependency.name.start_with?('React') || 
+          dependency.name.start_with?('RN') || 
+          dependency.name.include?('react-native') ||
+          dependency.name == 'rn-fetch-blob' ||
+          dependency.name.start_with?('Yoga') ||
+          dependency.name.start_with?('FBReact')
+        end
       end
     end`;
 
