@@ -18,11 +18,9 @@ export default function getEasManagedCredentialsConfigExtra(config: ExpoConfig):
                 // keep in sync with native changes in NSE
                 targetName: NSE_TARGET_NAME,
                 bundleIdentifier: `${config?.ios?.bundleIdentifier}.${NSE_TARGET_NAME}`,
-                entitlements: {
-                  'com.apple.security.application-groups': [
-                    `group.${config?.ios?.bundleIdentifier}.nse`
-                  ]
-                },
+                // NOTE: App Groups capability removed - no longer required
+                // If you need App Groups, add them manually to your provisioning profile
+                entitlements: {},
               }
             ]
           }

@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const iosConstants_1 = require("../iosConstants");
 function getEasManagedCredentialsConfigExtra(config) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s;
     return {
         ...config.extra,
         eas: {
@@ -19,11 +19,9 @@ function getEasManagedCredentialsConfigExtra(config) {
                                 // keep in sync with native changes in NSE
                                 targetName: iosConstants_1.NSE_TARGET_NAME,
                                 bundleIdentifier: `${(_s = config === null || config === void 0 ? void 0 : config.ios) === null || _s === void 0 ? void 0 : _s.bundleIdentifier}.${iosConstants_1.NSE_TARGET_NAME}`,
-                                entitlements: {
-                                    'com.apple.security.application-groups': [
-                                        `group.${(_t = config === null || config === void 0 ? void 0 : config.ios) === null || _t === void 0 ? void 0 : _t.bundleIdentifier}.nse`
-                                    ]
-                                },
+                                // NOTE: App Groups capability removed - no longer required
+                                // If you need App Groups, add them manually to your provisioning profile
+                                entitlements: {},
                             }
                         ]
                     }
