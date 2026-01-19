@@ -9,6 +9,8 @@ If you're getting errors like:
 
 This is a **CocoaPods limitation** when using `use_frameworks! :linkage => :static` with multiple targets that share dependencies.
 
+**Note:** As of version 1.1.0+, this plugin **automatically** injects the necessary `BUILD_LIBRARY_FOR_DISTRIBUTION = 'YES'` fix into your Podfile's `post_install` hook. If you're still experiencing this issue, please run `npx expo prebuild --clean` to regenerate your Podfile with the latest fixes.
+
 ## Solution: Manual Podfile Configuration
 
 ### Option 1: Use Script Phases (Recommended)

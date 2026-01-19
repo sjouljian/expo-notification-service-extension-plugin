@@ -58,15 +58,11 @@ export class PodfileManager {
         return `  pod '${trimmed}'`;
       }).join('\n');
 
-      // Check if we need GoogleUtilities (required for Firebase)
-      const hasFirebase = podDependencies.some(dep => dep.toLowerCase().includes('firebase'));
-      const googleUtilitiesLine = hasFirebase ? "  pod 'GoogleUtilities'\n" : '';
-
-      // Create extension target exactly as shown in working Podfile
+      // Create extension target - no GoogleUtilities needed, it will be inherited
       // Simple, isolated, no use_expo_modules! or use_native_modules!
       const nseTargetBlock = `
 target '${NSE_TARGET_NAME}' do
-${googleUtilitiesLine}${podLines}
+${podLines}
 end
 `;
 
@@ -118,6 +114,9 @@ end
         podfileContent = lines.join('\n');
       }
 
+      // Now inject the post_install hook fix to prevent duplicate framework builds
+      podfileContent = this.injectPostInstallHook(podfileContent);
+
       Log.log(`[PodfileManager] Writing updated Podfile to: ${this.podfilePath}`);
       fs.writeFileSync(this.podfilePath, podfileContent, 'utf-8');
       Log.log(`✅ [PodfileManager] Successfully added ${podDependencies.length} pod dependencies to ${NSE_TARGET_NAME} target in Podfile.`);
@@ -126,6 +125,84 @@ end
       Log.error(`Failed to modify Podfile: ${error}`);
       throw error;
     }
+  }
+
+  /**
+   * Injects or updates the post_install hook to fix duplicate framework builds
+   * This prevents "Multiple commands produce" errors with GoogleUtilities and other shared frameworks
+   */
+  private injectPostInstallHook(podfileContent: string): string {
+    const fixCode = `
+    # Fix for duplicate framework builds when using extension targets with shared dependencies
+    # This prevents "Multiple commands produce" errors for GoogleUtilities and other frameworks
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # Ensure frameworks are built once and can be distributed to multiple targets
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      end
+    end`;
+
+    // Check if there's already a post_install block
+    const postInstallRegex = /post_install\s+do\s+\|([^|]+)\|/;
+    const match = podfileContent.match(postInstallRegex);
+
+    if (match) {
+      // post_install exists - check if our fix is already there
+      if (podfileContent.includes('BUILD_LIBRARY_FOR_DISTRIBUTION')) {
+        Log.log('[PodfileManager] BUILD_LIBRARY_FOR_DISTRIBUTION already present in post_install hook.');
+        return podfileContent;
+      }
+
+      // Find the end of the post_install block and inject our code before it
+      const lines = podfileContent.split('\n');
+      let postInstallDepth = 0;
+      let inPostInstall = false;
+      let injectionIndex = -1;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        if (postInstallRegex.test(line)) {
+          inPostInstall = true;
+          postInstallDepth = 0;
+          continue;
+        }
+
+        if (inPostInstall) {
+          // Count nested 'do' blocks
+          if (line.match(/\bdo\b/)) {
+            postInstallDepth++;
+          }
+          
+          // Count 'end' keywords
+          if (line.trim() === 'end' || line.trim().startsWith('end ')) {
+            if (postInstallDepth > 0) {
+              postInstallDepth--;
+            } else {
+              // This is the 'end' that closes post_install
+              injectionIndex = i;
+              break;
+            }
+          }
+        }
+      }
+
+      if (injectionIndex !== -1) {
+        Log.log(`[PodfileManager] Injecting BUILD_LIBRARY_FOR_DISTRIBUTION fix into existing post_install hook at line ${injectionIndex}`);
+        lines.splice(injectionIndex, 0, fixCode);
+        return lines.join('\n');
+      }
+    }
+
+    // No post_install found - create one at the end of the file
+    Log.log('[PodfileManager] No post_install hook found. Creating new post_install hook with BUILD_LIBRARY_FOR_DISTRIBUTION fix.');
+    const newPostInstall = `
+
+post_install do |installer|${fixCode}
+end
+`;
+    
+    return podfileContent + newPostInstall;
   }
 }
 

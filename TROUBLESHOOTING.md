@@ -8,11 +8,32 @@
 ```
 
 ### Root Cause
-Both the main app and extension targets are building the same Firebase framework, causing duplicate outputs.
+When using `use_frameworks! :linkage => :static` with multiple targets that share dependencies (like Firebase/GoogleUtilities), CocoaPods tries to build separate static frameworks for each target, causing duplicate build commands.
+
+### Automatic Fix (v1.1.0+)
+
+**This plugin now automatically fixes this issue!** When you configure `podDependencies` in your plugin config, it will:
+
+1. Create a separate `NotificationServiceExtension` target in your Podfile
+2. Add your specified pod dependencies
+3. **Automatically inject** `BUILD_LIBRARY_FOR_DISTRIBUTION = 'YES'` into the `post_install` hook
+4. This setting tells Xcode to build frameworks once and share them across targets
 
 ### Solution
 
-The extension target should use `inherit! :search_paths` **without** a separate `use_frameworks!` call. The correct Podfile structure:
+Simply run:
+```bash
+npx expo prebuild --clean
+cd ios
+pod install
+cd ..
+```
+
+The plugin will automatically generate a Podfile with the fix applied.
+
+### Expected Podfile Structure
+
+After running `expo prebuild`, your `ios/Podfile` should look like:
 
 ```ruby
 target 'YourApp' do
@@ -23,17 +44,25 @@ target 'YourApp' do
 end
 
 target 'NotificationServiceExtension' do
-  pod 'GoogleUtilities'  # ← Required for Firebase
   pod 'Firebase/Messaging'
-  # NO use_frameworks!, NO use_expo_modules!, NO inherit!
+  # Simple, standalone - no use_frameworks!, no use_expo_modules!
+end
+
+post_install do |installer|
+  # ... existing post_install code ...
+  
+  # Plugin automatically adds this fix:
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+    end
+  end
 end
 ```
 
-**Key Points:**
-- ✅ Extension target is completely standalone
-- ✅ GoogleUtilities is automatically added when using Firebase
-- ✅ No inheritance directives needed
-- ✅ Avoids duplicate build products
+### Manual Fix (If Automatic Fix Doesn't Work)
+
+If you're still seeing the error after `npx expo prebuild --clean`, you can manually verify or add the `BUILD_LIBRARY_FOR_DISTRIBUTION` setting in your Podfile's `post_install` hook as shown above.
 
 ---
 
