@@ -66,10 +66,15 @@ class PodfileManager {
                 }
                 return `  pod '${trimmed}'`;
             }).join('\n');
-            // Create extension target - no GoogleUtilities needed, it will be inherited
-            // Simple, isolated, no use_expo_modules! or use_native_modules!
+            // Create extension target with search_paths inheritance only
+            // This allows finding shared frameworks but doesn't actually link parent pods
             const nseTargetBlock = `
+# NotificationServiceExtension target - Isolated from React Native
 target '${iosConstants_1.NSE_TARGET_NAME}' do
+  # Only inherit search paths, not pod dependencies
+  # This prevents use_expo_modules! and use_native_modules! from linking React Native to this target
+  inherit! :search_paths
+  
 ${podLines}
 end
 `;
@@ -144,26 +149,38 @@ end
       end
     end
     
-    # Prevent React Native pods from being linked to the NotificationServiceExtension
+    # Prevent React Native from being linked to the NotificationServiceExtension
     # This fixes "'sharedApplication' is unavailable: not available on iOS (App Extension)" errors
     installer.pods_project.targets.each do |target|
-      if target.name == 'Pods-${iosConstants_1.NSE_TARGET_NAME}'
+      if target.name == 'Pods-${iosConstants_1.NSE_TARGET_NAME}' || target.name == '${iosConstants_1.NSE_TARGET_NAME}'
+        puts "Configuring #{target.name} as App Extension..."
         target.build_configurations.each do |config|
           config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
+          
+          # Remove React Native frameworks from the extension
+          config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
+          config.build_settings['OTHER_LDFLAGS'] = config.build_settings['OTHER_LDFLAGS'].gsub(/-framework "React[^"]*"/, '')
+          config.build_settings['OTHER_LDFLAGS'] = config.build_settings['OTHER_LDFLAGS'].gsub(/-framework "RN[^"]*"/, '')
+          config.build_settings['OTHER_LDFLAGS'] = config.build_settings['OTHER_LDFLAGS'].gsub(/-framework "Expo[^"]*"/, '')
         end
-      end
-    end
-    
-    # Remove React Native dependencies from the extension target
-    extension_target = installer.pods_project.targets.find { |target| target.name == 'Pods-${iosConstants_1.NSE_TARGET_NAME}' }
-    if extension_target
-      extension_target.dependencies.delete_if do |dependency|
-        dependency_name = dependency.name
-        # Remove React Native, Expo, and other app-only dependencies
-        dependency_name.start_with?('React') || 
-        dependency_name.start_with?('Expo') ||
-        dependency_name.start_with?('RN') ||
-        ['Yoga', 'DoubleConversion', 'glog', 'Flipper', 'FlipperKit'].include?(dependency_name)
+        
+        # Remove source files from React Native pods in the extension's compile phase
+        target.source_build_phase.files.each do |build_file|
+          file_ref = build_file.file_ref
+          next unless file_ref
+          
+          file_path = file_ref.real_path.to_s
+          should_remove = file_path.include?('node_modules/react-native/') ||
+                         file_path.include?('node_modules/React') ||
+                         file_path.include?('node_modules/@react-native/') ||
+                         file_path.include?('node_modules/rn-') ||
+                         file_path.include?('node_modules/expo')
+          
+          if should_remove
+            puts "  Removing React Native file from extension: #{file_path}"
+            target.source_build_phase.remove_file_reference(file_ref)
+          end
+        end
       end
     end`.replace(/\$\{NSE_TARGET_NAME\}/g, iosConstants_1.NSE_TARGET_NAME);
         // Check if there's already a post_install block

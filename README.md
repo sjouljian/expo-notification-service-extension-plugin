@@ -167,14 +167,29 @@ See [NotificationService-Firebase-Example.m](support/serviceExtensionFiles/Notif
 #### Error: 'sharedApplication' is unavailable (App Extension)
 ```
 ❌ 'sharedApplication' is unavailable: not available on iOS (App Extension)
+❌ Error from RCTScrollView.m, RNFetchBlobRequest.m, or other React Native files
 ```
 
 **Also automatically fixed!** The plugin now:
-1. Sets `APPLICATION_EXTENSION_API_ONLY = 'YES'` for the extension target
-2. Removes React Native, Expo, and other app-only dependencies from the extension
-3. Ensures only Firebase/specified pods are linked to the extension
+1. Creates a completely isolated extension target (not nested)
+2. Sets `APPLICATION_EXTENSION_API_ONLY = 'YES'` 
+3. **Removes React Native source files** from the extension's compile phase
+4. Strips React Native frameworks from the extension's linker flags
+5. Ensures only your specified `podDependencies` are linked
 
-If you still see this error, run `npx expo prebuild --clean` and then `cd ios && pod install`.
+**Solution:**
+```bash
+npx expo prebuild --clean
+cd ios
+pod install
+cd ..
+```
+
+The plugin now uses `inherit! :search_paths` in the extension target, which:
+- Prevents `use_expo_modules!` and `use_native_modules!` from linking React Native to the extension
+- Allows the extension to find shared frameworks without actually linking them
+- Completely isolates the extension from app dependencies
+- Plus, the post_install hook removes any React Native files that slip through
 
 ## Prebuild (optional)
 Prebuilding in Expo will result in the generation of the native runtime code for the project (and `ios` and `android` directories being built). By prebuilding, we automatically link and configure the native modules that have implemented CocoaPods, autolinking, and other config plugins. You can think of prebuild like a native code bundler.

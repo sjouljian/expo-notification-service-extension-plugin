@@ -88,8 +88,15 @@ React Native libraries are being compiled/linked to the NotificationServiceExten
 
 1. Create an isolated `NotificationServiceExtension` target (not nested)
 2. Set `APPLICATION_EXTENSION_API_ONLY = 'YES'` for the extension
-3. **Automatically remove** React Native, Expo, and app-only dependencies from the extension
-4. Only link the pods you specify in `podDependencies` (e.g., Firebase/Messaging)
+3. **Remove React Native source files** from the extension's compile phase during `pod install`
+4. Strip React Native/Expo framework references from linker flags
+5. Only compile and link the pods you specify in `podDependencies`
+
+The fix works by:
+- Scanning the extension target's source build phase
+- Removing any `.m` files from `node_modules/react-native/`, `node_modules/rn-*`, `node_modules/expo`, etc.
+- Cleaning `OTHER_LDFLAGS` to remove React Native framework references
+- Setting extension-only build settings
 
 ### Solution: Clean Rebuild
 
@@ -102,10 +109,26 @@ pod install
 cd ..
 ```
 
-The plugin will automatically generate a Podfile that:
-- ✅ Excludes React Native from the extension
-- ✅ Sets proper extension API restrictions
-- ✅ Only links specified Firebase/custom pods
+**The plugin uses two levels of protection:**
+
+1. **`inherit! :search_paths`** in the extension target - This tells CocoaPods to ONLY inherit search paths, not actual pod dependencies. This prevents `use_expo_modules!` and `use_native_modules!` from linking React Native to the extension.
+
+2. **Aggressive post_install cleanup** - Removes any React Native files that still make it through:
+   ```
+   Configuring NotificationServiceExtension as App Extension...
+     Removing React Native file from extension: .../RCTScrollView.m
+     Removing React Native file from extension: .../RNFetchBlobRequest.m
+   ```
+
+**Expected Podfile structure after fix:**
+```ruby
+target 'NotificationServiceExtension' do
+  # This line is KEY - it prevents inheriting parent dependencies
+  inherit! :search_paths
+  
+  pod 'Firebase/Messaging'
+end
+```
 
 ### Expected Podfile Structure
 
@@ -139,21 +162,42 @@ target 'YourApp' do
       end
     end
     
-    # Fix 3: Remove React Native from extension
-    extension_target = installer.pods_project.targets.find { |target| target.name == 'Pods-NotificationServiceExtension' }
-    if extension_target
-      extension_target.dependencies.delete_if do |dependency|
-        dependency_name = dependency.name
-        dependency_name.start_with?('React') || 
-        dependency_name.start_with?('Expo') ||
-        dependency_name.start_with?('RN')
+    # Fix 3: Aggressively remove React Native from extension
+    installer.pods_project.targets.each do |target|
+      if target.name == 'Pods-NotificationServiceExtension' || target.name == 'NotificationServiceExtension'
+        puts "Configuring #{target.name} as App Extension..."
+        target.build_configurations.each do |config|
+          config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
+          
+          # Remove React Native frameworks from linker
+          config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
+          config.build_settings['OTHER_LDFLAGS'] = config.build_settings['OTHER_LDFLAGS'].gsub(/-framework "React[^"]*"/, '')
+        end
+        
+        # Remove React Native source files from compile phase
+        target.source_build_phase.files.each do |build_file|
+          file_ref = build_file.file_ref
+          next unless file_ref
+          
+          file_path = file_ref.real_path.to_s
+          should_remove = file_path.include?('node_modules/react-native/') ||
+                         file_path.include?('node_modules/rn-')
+          
+          if should_remove
+            puts "  Removing: #{file_path}"
+            target.source_build_phase.remove_file_reference(file_ref)
+          end
+        end
       end
     end
   end
 end
 
-# Separate, isolated extension target
+# Separate, isolated extension target with inheritance control
 target 'NotificationServiceExtension' do
+  # CRITICAL: This prevents inheriting React Native dependencies from parent scopes
+  inherit! :search_paths
+  
   pod 'Firebase/Messaging'
   # ONLY the pods you specified in podDependencies
   # NO use_native_modules! or use_expo_modules!
@@ -162,8 +206,9 @@ end
 
 **Key Points:**
 - ✅ Extension target is **separate**, not nested
+- ✅ Uses `inherit! :search_paths` to prevent dependency inheritance
 - ✅ Extension has **no** `use_expo_modules!` or `use_native_modules!`
-- ✅ `post_install` automatically excludes React Native from extension
+- ✅ `post_install` hook provides additional cleanup
 - ✅ All fixes are injected automatically by the plugin
 
 ### Verify Plugin Configuration
