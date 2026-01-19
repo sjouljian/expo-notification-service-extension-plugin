@@ -146,16 +146,21 @@ end
       target.build_configurations.each do |config|
         # Ensure frameworks are built once and can be distributed to multiple targets
         config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+        
+        # Prevent resource bundle duplicates
+        config.build_settings['COMBINE_HIDPI_IMAGES'] = 'NO'
       end
     end
     
-    # Prevent React Native from being linked to the NotificationServiceExtension
-    # This fixes "'sharedApplication' is unavailable: not available on iOS (App Extension)" errors
+    # Configure extension target with App Extension restrictions
     installer.pods_project.targets.each do |target|
       if target.name == 'Pods-${iosConstants_1.NSE_TARGET_NAME}' || target.name == '${iosConstants_1.NSE_TARGET_NAME}'
         puts "Configuring #{target.name} as App Extension..."
         target.build_configurations.each do |config|
           config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
+          
+          # Don't build/embed frameworks - they'll be provided by the main app
+          config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'
           
           # Remove React Native frameworks from the extension
           config.build_settings['OTHER_LDFLAGS'] ||= '$(inherited)'
@@ -180,6 +185,16 @@ end
             puts "  Removing React Native file from extension: #{file_path}"
             target.source_build_phase.remove_file_reference(file_ref)
           end
+        end
+      end
+    end
+    
+    # Prevent duplicate framework builds by ensuring pods are only built once
+    # This is especially important for GoogleUtilities and other shared Firebase dependencies
+    installer.aggregate_targets.each do |aggregate_target|
+      aggregate_target.pod_targets.select { |pod_target| pod_target.pod_name.start_with?('Google') }.each do |pod_target|
+        pod_target.build_configurations.each do |config|
+          config.build_settings['SKIP_INSTALL'] = 'YES'
         end
       end
     end`.replace(/\$\{NSE_TARGET_NAME\}/g, iosConstants_1.NSE_TARGET_NAME);
