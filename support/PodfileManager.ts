@@ -140,7 +140,30 @@ end
         # Ensure frameworks are built once and can be distributed to multiple targets
         config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
       end
-    end`;
+    end
+    
+    # Prevent React Native pods from being linked to the NotificationServiceExtension
+    # This fixes "'sharedApplication' is unavailable: not available on iOS (App Extension)" errors
+    installer.pods_project.targets.each do |target|
+      if target.name == 'Pods-${NSE_TARGET_NAME}'
+        target.build_configurations.each do |config|
+          config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
+        end
+      end
+    end
+    
+    # Remove React Native dependencies from the extension target
+    extension_target = installer.pods_project.targets.find { |target| target.name == 'Pods-${NSE_TARGET_NAME}' }
+    if extension_target
+      extension_target.dependencies.delete_if do |dependency|
+        dependency_name = dependency.name
+        # Remove React Native, Expo, and other app-only dependencies
+        dependency_name.start_with?('React') || 
+        dependency_name.start_with?('Expo') ||
+        dependency_name.start_with?('RN') ||
+        ['Yoga', 'DoubleConversion', 'glog', 'Flipper', 'FlipperKit'].include?(dependency_name)
+      end
+    end`.replace(/\$\{NSE_TARGET_NAME\}/g, NSE_TARGET_NAME);
 
     // Check if there's already a post_install block
     const postInstallRegex = /post_install\s+do\s+\|([^|]+)\|/;

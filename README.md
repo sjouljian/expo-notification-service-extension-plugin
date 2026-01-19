@@ -164,6 +164,18 @@ See [NotificationService-Firebase-Example.m](support/serviceExtensionFiles/Notif
 
 **The plugin now automatically fixes this!** It injects `BUILD_LIBRARY_FOR_DISTRIBUTION = 'YES'` into your Podfile's `post_install` hook to prevent duplicate framework builds. If you still see this error, run `npx expo prebuild --clean` to regenerate the Podfile.
 
+#### Error: 'sharedApplication' is unavailable (App Extension)
+```
+❌ 'sharedApplication' is unavailable: not available on iOS (App Extension)
+```
+
+**Also automatically fixed!** The plugin now:
+1. Sets `APPLICATION_EXTENSION_API_ONLY = 'YES'` for the extension target
+2. Removes React Native, Expo, and other app-only dependencies from the extension
+3. Ensures only Firebase/specified pods are linked to the extension
+
+If you still see this error, run `npx expo prebuild --clean` and then `cd ios && pod install`.
+
 ## Prebuild (optional)
 Prebuilding in Expo will result in the generation of the native runtime code for the project (and `ios` and `android` directories being built). By prebuilding, we automatically link and configure the native modules that have implemented CocoaPods, autolinking, and other config plugins. You can think of prebuild like a native code bundler.
 

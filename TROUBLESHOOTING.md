@@ -82,20 +82,19 @@ From files like:
 ### Root Cause
 React Native libraries are being compiled/linked to the NotificationServiceExtension target, but app extensions cannot use `UIApplication.sharedApplication` and other app-only APIs.
 
-### Solution 1: Verify the Target (Most Common)
+### Automatic Fix (v1.1.0+)
 
-**Check which target is actually failing:**
+**This plugin now automatically fixes this issue!** When you configure `podDependencies`, it will:
 
-Look closely at the build error. It should say either:
-- `(in target 'NotificationServiceExtension' from project 'YourApp')` ← Extension problem
-- `(in target 'YourApp' from project 'YourApp')` ← Main app problem (not related to this plugin)
+1. Create an isolated `NotificationServiceExtension` target (not nested)
+2. Set `APPLICATION_EXTENSION_API_ONLY = 'YES'` for the extension
+3. **Automatically remove** React Native, Expo, and app-only dependencies from the extension
+4. Only link the pods you specify in `podDependencies` (e.g., Firebase/Messaging)
 
-If it's the main app target, this is a React Native compatibility issue, not related to the extension.
+### Solution: Clean Rebuild
 
-### Solution 2: Clean Build
-
+Simply run:
 ```bash
-# In your project
 npx expo prebuild --clean
 cd ios
 rm -rf Pods Podfile.lock
@@ -103,78 +102,71 @@ pod install
 cd ..
 ```
 
-### Solution 3: Verify Podfile Structure
+The plugin will automatically generate a Podfile that:
+- ✅ Excludes React Native from the extension
+- ✅ Sets proper extension API restrictions
+- ✅ Only links specified Firebase/custom pods
 
-After running `expo prebuild`, check your `ios/Podfile`. It should look like:
+### Expected Podfile Structure
+
+After running `expo prebuild`, your `ios/Podfile` should automatically look like:
 
 ```ruby
 target 'YourApp' do
-  use_native_modules!
-  # ... main app pods
-end
-
-# This target should be SEPARATE and NOT nested
-target 'NotificationServiceExtension' do
   use_frameworks! :linkage => :static
-  pod 'Firebase/Messaging'
-  # ONLY the pods you specified in podDependencies
-  # NO use_native_modules! here
-end
-```
-
-**❌ WRONG** - Extension inside main target:
-```ruby
-target 'YourApp' do
+  use_expo_modules!
   use_native_modules!
+  # ... main app pods and React Native
   
-  target 'NotificationServiceExtension' do  # ← BAD: nested
-    pod 'Firebase/Messaging'
-  end
-end
-```
-
-### Solution 4: Manual Podfile Fix (If Auto-generation Fails)
-
-If the plugin isn't generating the Podfile correctly, manually add this to your `ios/Podfile`:
-
-```ruby
-# Add AFTER the main app target's end
-target 'NotificationServiceExtension' do
-  use_frameworks! :linkage => :static
-  pod 'Firebase/Messaging'
-end
-```
-
-### Solution 5: Exclude React Native from Extension (Advanced)
-
-If React Native is still being linked, add this post_install hook to your Podfile:
-
-```ruby
-post_install do |installer|
-  # ... existing post_install code ...
-  
-  # Ensure extension doesn't link React Native
-  installer.pods_project.targets.each do |target|
-    if target.name.include?("NotificationServiceExtension")
+  post_install do |installer|
+    # ... existing Expo/React Native post_install code ...
+    
+    # Plugin automatically adds these fixes:
+    
+    # Fix 1: Prevent duplicate framework builds
+    installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
+      end
+    end
+    
+    # Fix 2: Set extension restrictions
+    installer.pods_project.targets.each do |target|
+      if target.name == 'Pods-NotificationServiceExtension'
+        target.build_configurations.each do |config|
+          config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
+        end
+      end
+    end
+    
+    # Fix 3: Remove React Native from extension
+    extension_target = installer.pods_project.targets.find { |target| target.name == 'Pods-NotificationServiceExtension' }
+    if extension_target
+      extension_target.dependencies.delete_if do |dependency|
+        dependency_name = dependency.name
+        dependency_name.start_with?('React') || 
+        dependency_name.start_with?('Expo') ||
+        dependency_name.start_with?('RN')
       end
     end
   end
 end
+
+# Separate, isolated extension target
+target 'NotificationServiceExtension' do
+  pod 'Firebase/Messaging'
+  # ONLY the pods you specified in podDependencies
+  # NO use_native_modules! or use_expo_modules!
+end
 ```
 
-### Solution 6: Check Xcode Project Directly
+**Key Points:**
+- ✅ Extension target is **separate**, not nested
+- ✅ Extension has **no** `use_expo_modules!` or `use_native_modules!`
+- ✅ `post_install` automatically excludes React Native from extension
+- ✅ All fixes are injected automatically by the plugin
 
-Open `ios/YourApp.xcworkspace` in Xcode:
-
-1. Select the project in the navigator
-2. Select **NotificationServiceExtension** target
-3. Go to **Build Phases** → **Compile Sources**
-4. Verify ONLY `NotificationService.m` is listed
-5. If you see React Native files, remove them manually
-
-### Solution 7: Verify Plugin Configuration
+### Verify Plugin Configuration
 
 In your `app.json` or `app.config.js`:
 
@@ -195,14 +187,27 @@ In your `app.json` or `app.config.js`:
 
 Make sure:
 - ✅ `podDependencies` is an array
-- ✅ Only includes pods actually needed by the extension
+- ✅ Only includes pods actually needed by the extension (e.g., Firebase/Messaging)
 - ✅ Does NOT include React Native pods
+
+### Manual Verification (If Still Having Issues)
+
+Open `ios/YourApp.xcworkspace` in Xcode:
+
+1. Select the project in the navigator
+2. Select **NotificationServiceExtension** target
+3. Go to **Build Phases** → **Compile Sources**
+4. Verify ONLY `NotificationService.m` is listed
+5. If you see React Native files, the Podfile wasn't generated correctly
 
 ### Still Not Working?
 
-1. Check the build logs to see which target is actually failing
-2. Verify the Podfile structure matches Solution 3
-3. Try a completely clean build:
+1. **Ensure you're using the latest plugin version** (v1.1.0+):
+   ```bash
+   npm install expo-notification-service-extension-plugin@latest
+   ```
+
+2. **Try a completely clean build**:
    ```bash
    rm -rf ios android node_modules
    npm install
@@ -210,8 +215,17 @@ Make sure:
    cd ios && pod install && cd ..
    ```
 
-4. If using Ionic Appflow or another CI/CD, ensure:
-   - Build cache is cleared
-   - Latest plugin version is being installed
-   - Pod install runs after expo prebuild
+3. **Check which target is failing** in the build logs:
+   - `(in target 'NotificationServiceExtension')` ← Extension problem (should be fixed by plugin)
+   - `(in target 'YourApp')` ← Main app problem (not related to this plugin)
+
+4. **If using CI/CD** (EAS Build, Ionic Appflow, etc.):
+   - Clear build cache
+   - Ensure latest plugin version is installed
+   - Verify `pod install` runs after `expo prebuild`
+
+5. **Check your Podfile** manually at `ios/Podfile`:
+   - Ensure the extension target is NOT nested inside the main target
+   - Verify the `post_install` hook includes the React Native exclusion code
+   - Make sure extension target has NO `use_expo_modules!` or `use_native_modules!`
 
